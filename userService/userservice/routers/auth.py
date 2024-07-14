@@ -6,20 +6,19 @@ from passlib.context import CryptContext
 import jwt
 from sqlmodel import Session, select
 from userservice.models import Token, TokenData, User
-from userservice.main import getSession
+from userservice.db import getSession
+from userservice.setting  import SECRET_KEY,ALGORITHM
 
 router=APIRouter(
-    prefix='/user',
+    prefix='/auth',
     tags=['Auth'],
 )
 
-SECRET_KEY = "09d25e094faa6ca2556c818166b7a9563b93f7099f6f0f4caa6cf63b88e8d3e7"
-ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="user/login")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 
 def create_access_token(data: dict, expires_delta: timedelta | None = None):
     to_encode = data.copy()
@@ -31,9 +30,9 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None):
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt          
 
-def authenticate_user(user:User , Vuser , Vpassword):
-    if not user.username==Vuser and user.password==Vpassword:
-        raise HTTPException(status_code=401 , details="invaild credientials")
+def authenticate_user(user,Vuser,Vpassword):
+    if not (user.username==Vuser and user.password==Vpassword):
+        raise HTTPException(status_code=401 , detail="invaild credientials")
     return user
 
 
@@ -45,36 +44,36 @@ async def get_current_user(token: Annotated[str, Depends(oauth2_scheme)],session
     )
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        username: str = payload.get("sub")
-        if username is None:
+        email: str | None = payload.get("sub")
+        if email is None:
             raise credentials_exception
-        token_data = TokenData(username=username)
+        token_data = TokenData(email=email)
     except jwt.InvalidTokenError:
         raise credentials_exception
     # user = get_user(fake_users_db, username=token_data.username)
-    user:User = session.exec(select(User).filter(User.username==token_data.username)).first()
+    user:User = session.exec(select(User).filter(User.email==token_data.email)).first()
     if user is None:
         raise credentials_exception
     return user
 
 @router.post('/register' , response_model=User)
 async def register_user(user:User  ,session : Annotated[Session , Depends(getSession)]):
-    if not session.exec(select(User).filter(User.username==user.username)).first():
+    if not session.exec(select(User).filter(User.email==user.email)).first():
         session.add(user)
         session.commit()
         session.refresh(user)
         return user
     raise HTTPException(status_code=409,detail="user already exist")
 
-@router.post('/login' , response_model=Token)
+@router.post('/login' ,response_model=Token)
 async def login_user(session:Annotated[Session , Depends(getSession)],form_data: Annotated[OAuth2PasswordRequestForm, Depends()])->Token:   
     # user = session.get(User,id)
-    is_user:User = session.exec(select(User).filter(User.username==form_data.username)).first()
-    user = authenticate_user(form_data,is_user.username , is_user.password)
-    if not user or not is_user:
+    isUser = session.exec(select(User).filter(User.email==form_data.username)).first()
+    user = authenticate_user(form_data,isUser.email,isUser.password)
+    if not user or not isUser:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username or password",
+            detail="Incorrect email or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
@@ -82,4 +81,3 @@ async def login_user(session:Annotated[Session , Depends(getSession)],form_data:
         data={"sub": user.username}, expires_delta=access_token_expires
     )
     return Token(access_token=access_token, token_type="bearer")
-

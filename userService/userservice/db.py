@@ -1,7 +1,7 @@
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 from fastapi import FastAPI
-from sqlmodel import SQLModel, Session , create_engine
+from sqlmodel import SQLModel, Session ,create_engine
 from userservice import setting
 
 
@@ -19,6 +19,7 @@ async def lifespan(app:FastAPI)->AsyncGenerator[None , None]:
     print("hooray  creating tables")
     create_db_and_table()
     yield
+
 
 def getSession():
     with Session(engine) as session:
