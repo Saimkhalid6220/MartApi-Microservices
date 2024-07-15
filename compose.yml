@@ -13,6 +13,16 @@ services:
       - "8000:8000"  # Expose container port 8000 to host port 8000  
     networks:
       - my-api-net
+  productservice:
+    build:
+      context: ./productService
+      dockerfile: Dockerfile
+    depends_on: 
+      - postgres_db
+    ports:
+      - "8001:8001"
+    networks:
+      - my-api-net
   postgres_db:
     image: postgres:latest  # Use the official PostgreSQL image
     restart: always
