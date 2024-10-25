@@ -23,6 +23,27 @@ services:
       - "8001:8001"
     networks:
       - my-api-net
+  orderservice:
+    build:
+      context: ./orderService
+      dockerfile: Dockerfile
+    depends_on: 
+      - postgres_db
+    ports:
+      - "8002:8002"
+    networks:
+      - my-api-net
+  inventoryservice:
+    build:
+      context: ./InventoryService
+      dockerfile: Dockerfile
+    depends_on: 
+        - postgres_db
+    ports: 
+       - "8003:8003"
+    networks:
+       - my-api-net
+       
   postgres_db:
     image: postgres:latest  # Use the official PostgreSQL image
     restart: always
@@ -37,7 +58,6 @@ services:
         - postgres_db:/var/lib/postgresql/data
     networks:
       - my-api-net
-
 volumes:
   postgres_db:
     driver: local
